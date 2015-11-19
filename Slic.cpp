@@ -5,7 +5,6 @@
 
 #include "Slic.h"
 
-#define MAX_FLOAT 999999999
 
 void Slic::initialize(Mat& frame,int nspx,float wc)
 {
@@ -13,30 +12,32 @@ void Slic::initialize(Mat& frame,int nspx,float wc)
     m_wc = wc;
     m_height = frame.rows;
     m_width = frame.cols;
-    m_diamSpx = sqrt(m_height*m_width/m_nSpx);
+	m_diamSpx = (int)sqrt(m_width*m_height / (float)m_nSpx);
 
     //initialize labels
     m_labels.resize(m_height);
     m_allDist.resize(m_height);
     for(int j=0; j<m_height; j++){
         m_labels[j] = vector<int>(m_width,-1);
-        m_allDist[j] = vector<float>(m_width,MAX_FLOAT);
+        m_allDist[j] = vector<float>(m_width,FLT_MAX);
     }
 
 }
 
+
 void Slic::generateSpx(Mat & frame)
 {
-
+	m_allCenters.clear();
+	//cout << "supposed number of spx " << m_nSpx << endl;
     Mat frameLab;
-    cvtColor(frame,frameLab,CV_BGR2Lab);
+	cvtColor(frame,frameLab,CV_BGR2Lab);
     frameLab.convertTo(frameLab,CV_32FC3);
     //initializa clusters
     int diamSpx_d2 = m_diamSpx/2;
-    for(int y = diamSpx_d2; y<m_height; y+=m_diamSpx)
+    for(int y = diamSpx_d2-1; y<m_height; y+=m_diamSpx)
     {
         Vec3f* frameLab_r = frameLab.ptr<Vec3f>(y);
-        for(int x=diamSpx_d2; x<m_width; x+=m_diamSpx)
+        for(int x=diamSpx_d2-1; x<m_width; x+=m_diamSpx)
         {
             center c;
             c.xy = Point(x,y);
@@ -56,20 +57,22 @@ void Slic::generateSpx(Mat & frame)
         for(int j=0; j<m_width; j++)
         {
         m_labels[i][j] = -1;
-        m_allDist[i][j] = MAX_FLOAT;
+        m_allDist[i][j] = FLT_MAX;
         }
 
-    cout<<"supposed number of spx "<<m_nSpx<<endl;
+
     // iterate
     for(int it=0; it<MAXIT; it++)
     {
         findCenters(frameLab);
         updateCenters(frameLab);
+
     }
+	//for (int i = 0; i < 10; i++)cout <<"Lab "<< m_allCenters[i].Lab[0] << endl;
 
-    enforceConnectivity();
+    //enforceConnectivity();
 
-    cout<<"real number of spx "<<m_nSpx<<endl;
+   // cout<<"real number of spx "<<m_nSpx<<endl;
 }
 
 void Slic::display_meanColor(Mat& frame)
@@ -93,13 +96,14 @@ inline float slicDistance(center& c, float x, float y, float L, float a, float b
     float dc2 = pow(c.Lab[0]-L,2)+pow(c.Lab[1]-a,2)+pow(c.Lab[2]-b,2);
     float ds2 = pow(c.xy.x-x,2)+pow(c.xy.y-y,2);
 
+
     return sqrt(dc2+ds2/(S*S)*m*m);
 
 
 }
 void Slic::findCenters(Mat& frame)
 {
-    int diamSpx3d2 = m_diamSpx*1.5;
+    int diamSpx3d2 = m_diamSpx;
     for(int c=0; c<m_allCenters.size(); c++)
     {
         Point xy_c = m_allCenters[c].xy;
@@ -111,7 +115,7 @@ void Slic::findCenters(Mat& frame)
                         float d = slicDistance(m_allCenters[c], j, i, lab.val[0], lab.val[1], lab.val[2], m_diamSpx, m_wc);
 
                         if (d < m_allDist[i][j]) {
-                            m_allDist[i][j] = d;
+							m_allDist[i][j] = d;
                             m_labels[i][j] = c;
                         }
                     }
@@ -145,9 +149,6 @@ void Slic::updateCenters(Mat& frame)
                 m_allCenters[idxC].Lab[2] += lab.val[2];
 
                 counter[idxC]++;
-
-
-
         }
     }
     for(int i=0; i<m_allCenters.size(); i++)
