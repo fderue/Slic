@@ -7,7 +7,6 @@
 
 #define MAXIT 5
 
-
 #include <iostream>
 #include <opencv2/opencv.hpp>
 
@@ -17,7 +16,6 @@ using namespace std;
 typedef vector< vector<int> > vec2di;
 
 struct center;
-
 class Slic
 {
 private:
@@ -39,7 +37,14 @@ public:
     Slic(int nspx,float wc):m_nSpx(nspx),m_wc(wc){}
     ~Slic(){}
 
-    void initialize(Mat& frame,int nspx,float wc);
+	static enum InitType{
+		SLIC_SIZE,
+		SLIC_NSPX
+	};
+
+	/*SLIC_SIZE -> initialize by specifying the spx size
+	SLIC_NSPX -> initialize by specifying the number of spx*/
+    void initialize(Mat& frame,int nspx,float wc,Slic::InitType type);
     void generateSpx(Mat& frame);
     void enforceConnectivity();
     void findCenters(Mat& frame);
@@ -47,7 +52,6 @@ public:
 
     void display_contours(Mat& image,Scalar colour);
     void display_meanColor(Mat& frame);
-
 };
 
 struct center
@@ -60,6 +64,8 @@ struct center
         Lab[1] = 0.f;
     }
 };
+
+
 
 
 #endif //SLIC_SLIC_H

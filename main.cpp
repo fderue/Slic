@@ -2,69 +2,29 @@
 #include <opencv2/opencv.hpp>
 #include "Slic.h"
 
-#define NSPX 1000
+#define NSPX 1200
+#define SIZE_SPX 16
 #define WC 35
 
 using namespace std;
 using namespace cv;
 int main() {
 
-    Mat im = imread("D:/Pictures/cat.jpg");
-	//remap
-	/*
-	Mat dst, map_x, map_y;
-	dst.create(im.size(), im.type());
-	map_x.create(im.size(), CV_32FC1);
-	map_y.create(im.size(), CV_32FC1);
+    //Mat im = imread("/media/derue/4A30A96F30A962A5/Videos/Tiger1/img/0001.jpg");
+	Mat im = imread("D:/Pictures/test_pic/land1.jpg");
+	CV_Assert(im.data!=nullptr);
+    Slic seg;
+	seg.initialize(im, SIZE_SPX, WC, Slic::SLIC_SIZE);
 
-	for (int j = 0; j < im.rows; j++)
-	{
-		for (int i = 0; i < im.cols; i++) {
-			map_x.at<float>(j, i) = i;
-			map_y.at<float>(j, i) = im.rows - j-1;
-		}
+	for(int i=0; i<1; i++) {
+		auto start = getTickCount();
+		seg.generateSpx(im);
+		auto end = getTickCount();
+		cout << "runtime = " << (end - start) / getTickFrequency() << endl;
+		cout << "# iteration : " << MAXIT << endl;
 	}
-	remap(im, dst, map_x, map_y, CV_INTER_LINEAR, BORDER_CONSTANT, Scalar(0, 0, 0));
-
-	imshow("remap", dst);
-	dst = im.clone();
-	*/
-
-    /*Slic seg;
-    seg.initialize(im,NSPX,WC);
-	auto start = getTickCount();
-    seg.generateSpx(im);
-	auto end = getTickCount();
-	cout << "runtime = " << (end - start) / getTickFrequency()<<endl;
-    seg.display_contours(im,Scalar(255,0,0));
-
+    seg.display_contours(im,Scalar(0,0,255));
     imshow("seg", im);
-
-	seg.generateSpx(im);
-	seg.display_contours(im, Scalar(255, 0, 0));
-
-    cout<<"end"<<endl;*/
-
-
-
-	VideoCapture cap("D:/Videos/Tiger1/img/%04d.jpg");
-	//Mat frame0 = imread("D:/Videos/bolt/img/0001.jpg");
-	Mat frame;
-	cap >> frame;
-	Slic slic;
-
-	
-	namedWindow("outCPU");
-	while (cap.read(frame))
-	{
-		slic.initialize(frame, NSPX, WC);
-		slic.generateSpx(frame);
-		slic.display_contours(frame, Scalar(255, 0, 0));
-		imshow("out", frame);
-		waitKey();
-	}
-
-	
     waitKey();
 
     return 0;
