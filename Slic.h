@@ -29,12 +29,14 @@ private:
     vector<vector<float> > m_allDist;
     vector<center> m_allCenters;
 
-
+	void enforceConnectivity();
+	void findCenters(Mat& frame);
+	void updateCenters(Mat& frame);
 
 public:
 
     Slic(){}
-    Slic(int nspx,float wc):m_nSpx(nspx),m_wc(wc){}
+    //Slic(int nspx,float wc):m_nSpx(nspx),m_wc(wc){}
     ~Slic(){}
 
 	static enum InitType{
@@ -45,13 +47,15 @@ public:
 	/*SLIC_SIZE -> initialize by specifying the spx size
 	SLIC_NSPX -> initialize by specifying the number of spx*/
     void initialize(Mat& frame,int nspx,float wc,Slic::InitType type);
+	void resetVariables();
     void generateSpx(Mat& frame);
-    void enforceConnectivity();
-    void findCenters(Mat& frame);
-    void updateCenters(Mat& frame);
 
-    void display_contours(Mat& image,Scalar colour);
-    void display_meanColor(Mat& frame);
+	vec2di& getLabels();
+	int getNspx();
+	int getSspx();
+
+
+    void display_contours(Mat& image,Scalar colour=Scalar(255,0,0));
 };
 
 struct center

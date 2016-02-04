@@ -6,6 +6,15 @@
 #include "Slic.h"
 
 
+void Slic::resetVariables()
+{
+	m_allCenters.clear();
+	for (int j = 0; j < m_height; j++){
+		m_labels[j] = vector<int>(m_width, -1);
+		m_allDist[j] = vector<float>(m_width, FLT_MAX);
+	}
+}
+
 void Slic::initialize(Mat& frame, int nspx_size, float wc, InitType type)
 {
 	m_wc = wc;
@@ -37,12 +46,12 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 	int xloc, yloc;
 	for (int k = 1; k < 9; k++){
 		yloc = xy.y + dy_n[k];
-		if (yloc < frameLab.rows - 1){
+		if (yloc < frameLab.rows - 2&&yloc >= 0){
 
 
 			for (int l = 1; l < 9; l++){
 				xloc = xy.x + dx_n[l];
-				if (xloc < frameLab.cols-1){
+				if (xloc < frameLab.cols-2&&xloc>=0){
 					Vec3f cc = frameLab.at<Vec3f>(yloc, xloc);
 					Vec3f cd = frameLab.at<Vec3f>(yloc + 1, xloc);
 					Vec3f cr = frameLab.at<Vec3f>(yloc, xloc + 1);
@@ -62,7 +71,7 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 }
 void Slic::generateSpx(Mat & frame)
 {
-	m_allCenters.clear();
+	resetVariables();
 	Mat frameLab;
 	cvtColor(frame, frameLab, CV_BGR2Lab);
 	frameLab.convertTo(frameLab, CV_32FC3);
@@ -103,23 +112,7 @@ void Slic::generateSpx(Mat & frame)
 		updateCenters(frameLab);
 	}
 	findCenters(frameLab);
-	enforceConnectivity();
-}
-
-void Slic::display_meanColor(Mat& frame)
-{
-	Mat frameLab = Mat(frame.size(), CV_32FC3);
-	for (int i = 0; i < frame.rows; i++)
-	{
-		for (int j = 0; j < frame.cols; j++)
-		{
-			int idxC = m_labels[i][j];
-			if (idxC != -1)
-				frameLab.at<Vec3f>(i, j) = Vec3f(m_allCenters[idxC].Lab[0], m_allCenters[idxC].Lab[1], m_allCenters[idxC].Lab[2]);
-		}
-	}
-	frameLab.convertTo(frameLab, CV_8UC3);
-	cvtColor(frameLab, frame, CV_Lab2BGR);
+	enforceConnectivity(); 
 }
 
 inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S, float m)
@@ -127,10 +120,7 @@ inline float slicDistance(center& c, float x, float y, float L, float a, float b
 	float dc2 = pow(c.Lab[0] - L, 2) + pow(c.Lab[1] - a, 2) + pow(c.Lab[2] - b, 2);
 	float ds2 = pow(c.xy.x - x, 2) + pow(c.xy.y - y, 2);
 
-
 	return sqrt(dc2 + ds2 / (S*S)*m*m);
-
-
 }
 void Slic::findCenters(Mat& frame)
 {
@@ -170,14 +160,19 @@ void Slic::updateCenters(Mat& frame)
 		{
 
 			int idxC = m_labels[i][j];
-			Vec3f lab = frame.at<Vec3f>(i, j);
-			m_allCenters[idxC].xy += Point(j, i);
+			if (idxC != -1){
+				Vec3f lab = frame.at<Vec3f>(i, j);
+				m_allCenters[idxC].xy += Point(j, i);
 
-			m_allCenters[idxC].Lab[0] += lab.val[0];
-			m_allCenters[idxC].Lab[1] += lab.val[1];
-			m_allCenters[idxC].Lab[2] += lab.val[2];
+				m_allCenters[idxC].Lab[0] += lab.val[0];
+				m_allCenters[idxC].Lab[1] += lab.val[1];
+				m_allCenters[idxC].Lab[2] += lab.val[2];
 
-			counter[idxC]++;
+				counter[idxC]++;
+			}
+			else{
+				cerr << "one label is -1 : impossible normally" << endl;
+			}
 		}
 	}
 	for (int i = 0; i < m_allCenters.size(); i++)
@@ -267,6 +262,8 @@ void Slic::enforceConnectivity()
 		for (int j = 0; j < newLabels[i].size(); j++)
 			m_labels[i][j] = newLabels[i][j];
 
+	//Careful :index in m_allCenters does not correspond anymore to the right label, but we do not need then anymore
+
 }
 
 
@@ -316,3 +313,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 		image.at<Vec3b>(contours[i].y, contours[i].x) = Vec3b(colour[0], colour[1], colour[2]);
 	}
 }
+
+vec2di& Slic::getLabels(){ return m_labels;}
+int Slic::getNspx(){ return m_nSpx; }
+int Slic::getSspx(){ return m_diamSpx; }
