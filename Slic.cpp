@@ -6,6 +6,15 @@
 #include "Slic.h"
 
 
+void Slic::resetVariables()
+{
+	m_allCenters.clear();
+	m_labels.forEach<int>([](int &l, const int* position)->void{l = -1; });
+	for (int j = 0; j < m_height; j++){
+		std::for_each(m_allDist[j].begin(), m_allDist[j].end(), [](float& dist)->void{dist = FLT_MAX; });
+	}
+}
+
 void Slic::initialize(Mat& frame, int nspx_size, float wc, InitType type)
 {
 	m_wc = wc;
@@ -19,10 +28,9 @@ void Slic::initialize(Mat& frame, int nspx_size, float wc, InitType type)
 		m_diamSpx = nspx_size;
 	}
 	//initialize labels
-	m_labels.resize(m_height);
+	m_labels = Mat(m_height, m_width, CV_32S, Scalar(-1));
 	m_allDist.resize(m_height);
 	for (int j = 0; j < m_height; j++){
-		m_labels[j] = vector<int>(m_width, -1);
 		m_allDist[j] = vector<float>(m_width, FLT_MAX);
 	}
 
@@ -37,12 +45,12 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 	int xloc, yloc;
 	for (int k = 1; k < 9; k++){
 		yloc = xy.y + dy_n[k];
-		if (yloc < frameLab.rows - 1){
+		if (yloc < frameLab.rows - 2&&yloc >= 0){
 
 
 			for (int l = 1; l < 9; l++){
 				xloc = xy.x + dx_n[l];
-				if (xloc < frameLab.cols-1){
+				if (xloc < frameLab.cols-2&&xloc>=0){
 					Vec3f cc = frameLab.at<Vec3f>(yloc, xloc);
 					Vec3f cd = frameLab.at<Vec3f>(yloc + 1, xloc);
 					Vec3f cr = frameLab.at<Vec3f>(yloc, xloc + 1);
@@ -62,7 +70,7 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 }
 void Slic::generateSpx(Mat & frame)
 {
-	m_allCenters.clear();
+	resetVariables();
 	Mat frameLab;
 	cvtColor(frame, frameLab, CV_BGR2Lab);
 	frameLab.convertTo(frameLab, CV_32FC3);
@@ -87,15 +95,8 @@ void Slic::generateSpx(Mat & frame)
 			m_allCenters.push_back(c);
 		}
 	}
-	m_nSpx = m_allCenters.size(); //real number of spx
+	m_nSpx = (int)m_allCenters.size(); //real number of spx
 
-	//initialize labels and dist
-	for (int i = 0; i < m_height; i++)
-		for (int j = 0; j < m_width; j++)
-		{
-			m_labels[i][j] = -1;
-			m_allDist[i][j] = FLT_MAX;
-		}
 	// iterate
 	for (int it = 0; it < MAXIT; it++)
 	{
@@ -103,37 +104,21 @@ void Slic::generateSpx(Mat & frame)
 		updateCenters(frameLab);
 	}
 	findCenters(frameLab);
-	enforceConnectivity();
+	enforceConnectivity(); 
 }
 
-void Slic::display_meanColor(Mat& frame)
-{
-	Mat frameLab = Mat(frame.size(), CV_32FC3);
-	for (int i = 0; i < frame.rows; i++)
-	{
-		for (int j = 0; j < frame.cols; j++)
-		{
-			int idxC = m_labels[i][j];
-			if (idxC != -1)
-				frameLab.at<Vec3f>(i, j) = Vec3f(m_allCenters[idxC].Lab[0], m_allCenters[idxC].Lab[1], m_allCenters[idxC].Lab[2]);
-		}
-	}
-	frameLab.convertTo(frameLab, CV_8UC3);
-	cvtColor(frameLab, frame, CV_Lab2BGR);
-}
-
-inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S, float m)
+inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S2, float m2)
 {
 	float dc2 = pow(c.Lab[0] - L, 2) + pow(c.Lab[1] - a, 2) + pow(c.Lab[2] - b, 2);
 	float ds2 = pow(c.xy.x - x, 2) + pow(c.xy.y - y, 2);
 
-
-	return sqrt(dc2 + ds2 / (S*S)*m*m);
-
-
+	return dc2 + ds2 / S2*m2;
+	//return sqrt(dc2 + ds2 / S2*m2);
 }
 void Slic::findCenters(Mat& frame)
 {
+	float S2 = m_diamSpx*m_diamSpx;
+	float m2 = m_wc*m_wc;
 	int diamSpx3d2 = m_diamSpx;
 	for (int c = 0; c < m_allCenters.size(); c++)
 	{
@@ -143,11 +128,11 @@ void Slic::findCenters(Mat& frame)
 				for (int j = xy_c.x - diamSpx3d2; j < xy_c.x + diamSpx3d2; j++) {
 					if (i >= 0 && i < m_height && j >= 0 && j < m_width) {
 						Vec3f lab = frame.at<Vec3f>(i, j);
-						float d = slicDistance(m_allCenters[c], j, i, lab.val[0], lab.val[1], lab.val[2], m_diamSpx, m_wc);
+						float d = slicDistance(m_allCenters[c], j, i, lab.val[0], lab.val[1], lab.val[2], S2, m2);
 
 						if (d < m_allDist[i][j]) {
 							m_allDist[i][j] = d;
-							m_labels[i][j] = c;
+							m_labels.at<int>(i,j) = c;
 						}
 					}
 				}
@@ -166,18 +151,24 @@ void Slic::updateCenters(Mat& frame)
 	}
 	for (int i = 0; i < m_height; i++)
 	{
+		int* m_labels_ptr = m_labels.ptr<int>(i);
 		for (int j = 0; j < m_width; j++)
 		{
 
-			int idxC = m_labels[i][j];
-			Vec3f lab = frame.at<Vec3f>(i, j);
-			m_allCenters[idxC].xy += Point(j, i);
+			int idxC = m_labels_ptr[j];
+			if (idxC != -1){
+				Vec3f lab = frame.at<Vec3f>(i, j);
+				m_allCenters[idxC].xy += Point(j, i);
 
-			m_allCenters[idxC].Lab[0] += lab.val[0];
-			m_allCenters[idxC].Lab[1] += lab.val[1];
-			m_allCenters[idxC].Lab[2] += lab.val[2];
+				m_allCenters[idxC].Lab[0] += lab.val[0];
+				m_allCenters[idxC].Lab[1] += lab.val[1];
+				m_allCenters[idxC].Lab[2] += lab.val[2];
 
-			counter[idxC]++;
+				counter[idxC]++;
+			}
+			else{
+				cerr << "one label is -1 : impossible normally" << endl;
+			}
 		}
 	}
 	for (int i = 0; i < m_allCenters.size(); i++)
@@ -199,16 +190,13 @@ void Slic::updateCenters(Mat& frame)
 }
 
 
+const int dx4[4] = { -1, 0, 1, 0 };
+const int dy4[4] = { 0, -1, 0, 1 };
 void Slic::enforceConnectivity()
 {
 	int label = 0, adjlabel = 0;
 	int lims = (m_width * m_height) / (m_nSpx);
 	lims = lims >> 2;
-
-
-	const int dx4[4] = { -1, 0, 1, 0 };
-	const int dy4[4] = { 0, -1, 0, 1 };
-
 	vector<vector<int> >newLabels;
 	for (int i = 0; i < m_height; i++)
 	{
@@ -218,6 +206,7 @@ void Slic::enforceConnectivity()
 
 	for (int i = 0; i < m_height; i++)
 	{
+		int* m_labels_ptr = m_labels.ptr<int>(i);
 		for (int j = 0; j < m_width; j++)
 		{
 			if (newLabels[i][j] == -1)
@@ -243,7 +232,7 @@ void Slic::enforceConnectivity()
 						int x = elements[c].x + dx4[k], y = elements[c].y + dy4[k];
 						if (x >= 0 && x < m_width && y >= 0 && y < m_height)
 						{
-							if (newLabels[y][x] == -1 && m_labels[i][j] == m_labels[y][x])
+							if (newLabels[y][x] == -1 && m_labels_ptr[j] == m_labels.at<int>(y,x))
 							{
 								elements.push_back(Point(x, y));
 								newLabels[y][x] = label;//m_labels[i][j];
@@ -263,16 +252,19 @@ void Slic::enforceConnectivity()
 		}
 	}
 	m_nSpx = label;
-	for (int i = 0; i < newLabels.size(); i++)
-		for (int j = 0; j < newLabels[i].size(); j++)
-			m_labels[i][j] = newLabels[i][j];
+	for (int i = 0; i < newLabels.size(); i++){
+		int* m_labels_ptr = m_labels.ptr<int>(i);
+		for (int j = 0; j < newLabels[i].size(); j++) m_labels_ptr[j] = newLabels[i][j];
+	}
+
+	//Careful :index in m_allCenters does not correspond anymore to the right label, but we do not need then anymore
 
 }
-
+const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
+const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
 
 void Slic::display_contours(Mat& image, Scalar colour) {
-	const int dx8[8] = { -1, -1, 0, 1, 1, 1, 0, -1 };
-	const int dy8[8] = { 0, -1, -1, -1, 0, 1, 1, 1 };
+
 
 	/* Initialize the contour vector and the matrix detailing whether a pixel
 	 * is already taken to be a contour. */
@@ -288,6 +280,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 
 	/* Go through all the pixels. */
 	for (int i = 0; i < image.rows; i++) {
+		int* m_labels_ptr = m_labels.ptr<int>(i);
 		for (int j = 0; j < image.cols; j++) {
 
 			int nr_p = 0;
@@ -297,7 +290,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 				int x = j + dx8[k], y = i + dy8[k];
 
 				if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
-					if (istaken[y][x] == false && m_labels[i][j] != m_labels[y][x]) {
+					if (istaken[y][x] == false && m_labels_ptr[j] != m_labels.at<int>(y,x)) {
 						nr_p += 1;
 					}
 				}
@@ -316,3 +309,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 		image.at<Vec3b>(contours[i].y, contours[i].x) = Vec3b(colour[0], colour[1], colour[2]);
 	}
 }
+
+Mat Slic::getLabels(){ return m_labels;}
+int Slic::getNspx(){ return m_nSpx; }
+int Slic::getSspx(){ return m_diamSpx; }

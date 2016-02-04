@@ -11,12 +11,13 @@ using namespace cv;
 int main() {
 
     //Mat im = imread("/media/derue/4A30A96F30A962A5/Videos/Tiger1/img/0001.jpg");
-	Mat im = imread("D:/Pictures/test_pic/land1.jpg");
+	//Mat im = imread("D:/Pictures/test_pic/lena.jpg");
+	Mat im = imread("D:/Videos/CVPR_benchmark/tiger1/img/0001.jpg");
 	CV_Assert(im.data!=nullptr);
     Slic seg;
 	seg.initialize(im, SIZE_SPX, WC, Slic::SLIC_SIZE);
 
-	for(int i=0; i<1; i++) {
+	for(int i=0; i<5; i++) {
 		auto start = getTickCount();
 		seg.generateSpx(im);
 		auto end = getTickCount();

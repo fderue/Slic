@@ -20,21 +20,23 @@ class Slic
 {
 private:
     int m_nSpx;
-    int m_wc;
+    float m_wc;
     int m_width;
     int m_height;
     int m_diamSpx;
 
-    vec2di m_labels;
+    Mat m_labels;
     vector<vector<float> > m_allDist;
     vector<center> m_allCenters;
 
-
+	void enforceConnectivity();
+	void findCenters(Mat& frame);
+	void updateCenters(Mat& frame);
 
 public:
 
     Slic(){}
-    Slic(int nspx,float wc):m_nSpx(nspx),m_wc(wc){}
+    //Slic(int nspx,float wc):m_nSpx(nspx),m_wc(wc){}
     ~Slic(){}
 
 	static enum InitType{
@@ -45,13 +47,15 @@ public:
 	/*SLIC_SIZE -> initialize by specifying the spx size
 	SLIC_NSPX -> initialize by specifying the number of spx*/
     void initialize(Mat& frame,int nspx,float wc,Slic::InitType type);
+	void resetVariables();
     void generateSpx(Mat& frame);
-    void enforceConnectivity();
-    void findCenters(Mat& frame);
-    void updateCenters(Mat& frame);
 
-    void display_contours(Mat& image,Scalar colour);
-    void display_meanColor(Mat& frame);
+	Mat getLabels();
+	int getNspx();
+	int getSspx();
+
+
+    void display_contours(Mat& image,Scalar colour=Scalar(255,0,0));
 };
 
 struct center
