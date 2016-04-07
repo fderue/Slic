@@ -95,7 +95,7 @@ void Slic::generateSpx(Mat & frame)
 		findCenters(frameLab);
 		updateCenters(frameLab);
 	}
-	enforceConnectivity();
+	//enforceConnectivity();
 }
 
 inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S2, float m2)
@@ -307,6 +307,19 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 		image.at<Vec3b>(contours[i].y, contours[i].x) = Vec3b(colour[0], colour[1], colour[2]);
 	}
 }
+
+void Slic::displayMeanColor(Mat& out){
+	out = Mat(m_labels.size(), CV_32FC3, Scalar(0));
+	for (int i = 0; i < m_labels.rows; i++){
+		for (int j = 0; j < m_labels.cols; j++){
+			int idx = m_labels.at<int>(i, j);
+			out.at<Vec3f>(i, j) = Vec3f(m_allCenters[idx].Lab[0], m_allCenters[idx].Lab[1], m_allCenters[idx].Lab[2]);
+		}
+	}
+	out.convertTo(out, CV_8UC3);
+	cvtColor(out, out, CV_Lab2BGR);
+}
+
 
 Mat Slic::getLabels(){ return m_labels; }
 int Slic::getNspx(){ return m_nSpx; }

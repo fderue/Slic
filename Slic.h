@@ -59,6 +59,7 @@ public:
 
 
 	void display_contours(Mat& image, Scalar colour = Scalar(255, 0, 0));
+	void displayMeanColor(Mat& out);
 };
 
 struct center
@@ -68,7 +69,7 @@ struct center
 	center() :xy(Point(0, 0)){
 		Lab[0] = 0.f;
 		Lab[1] = 0.f;
-		Lab[1] = 0.f;
+		Lab[2] = 0.f;
 	}
 };
 
