@@ -1,10 +1,4 @@
-//
-// Created by derue on 15-09-16.
-//
-
-
 #include "Slic.h"
-
 
 void Slic::resetVariables()
 {
@@ -15,8 +9,9 @@ void Slic::resetVariables()
 	}
 }
 
-void Slic::initialize(Mat& frame, int nspx_size, float wc, InitType type)
+void Slic::initialize(Mat& frame, int nspx_size, float wc, int nIteration, InitType type)
 {
+	m_nIteration = nIteration;
 	m_wc = wc;
 	m_height = frame.rows;
 	m_width = frame.cols;
@@ -45,12 +40,12 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 	int xloc, yloc;
 	for (int k = 1; k < 9; k++){
 		yloc = xy.y + dy_n[k];
-		if (yloc < frameLab.rows - 2&&yloc >= 0){
+		if (yloc < frameLab.rows - 2 && yloc >= 0){
 
 
 			for (int l = 1; l < 9; l++){
 				xloc = xy.x + dx_n[l];
-				if (xloc < frameLab.cols-2&&xloc>=0){
+				if (xloc < frameLab.cols - 2 && xloc >= 0){
 					Vec3f cc = frameLab.at<Vec3f>(yloc, xloc);
 					Vec3f cd = frameLab.at<Vec3f>(yloc + 1, xloc);
 					Vec3f cr = frameLab.at<Vec3f>(yloc, xloc + 1);
@@ -85,9 +80,6 @@ void Slic::generateSpx(Mat & frame)
 			c.xy = Point(x, y);
 			Vec3f cLab;
 			moveToLowGrad(c.xy, cLab, frameLab);
-			/*c.Lab[0] = frameLab_r[x][0];
-			c.Lab[1] = frameLab_r[x][1];
-			c.Lab[2] = frameLab_r[x][2];*/
 			c.Lab[0] = cLab[0];
 			c.Lab[1] = cLab[1];
 			c.Lab[2] = cLab[2];
@@ -98,13 +90,12 @@ void Slic::generateSpx(Mat & frame)
 	m_nSpx = (int)m_allCenters.size(); //real number of spx
 
 	// iterate
-	for (int it = 0; it < MAXIT; it++)
+	for (int it = 0; it < m_nIteration; it++)
 	{
 		findCenters(frameLab);
 		updateCenters(frameLab);
 	}
-	findCenters(frameLab);
-	enforceConnectivity(); 
+	enforceConnectivity();
 }
 
 inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S2, float m2)
@@ -124,19 +115,22 @@ void Slic::findCenters(Mat& frame)
 	{
 		Point xy_c = m_allCenters[c].xy;
 		if (xy_c.x != -1) {
-			for (int i = xy_c.y - diamSpx3d2; i < xy_c.y + diamSpx3d2; i++) {
-				for (int j = xy_c.x - diamSpx3d2; j < xy_c.x + diamSpx3d2; j++) {
+			for (int i = xy_c.y - diamSpx3d2; i <= xy_c.y + diamSpx3d2; i++) {
+				for (int j = xy_c.x - diamSpx3d2; j <= xy_c.x + diamSpx3d2; j++) {
 					if (i >= 0 && i < m_height && j >= 0 && j < m_width) {
 						Vec3f lab = frame.at<Vec3f>(i, j);
 						float d = slicDistance(m_allCenters[c], j, i, lab.val[0], lab.val[1], lab.val[2], S2, m2);
 
 						if (d < m_allDist[i][j]) {
 							m_allDist[i][j] = d;
-							m_labels.at<int>(i,j) = c;
+							m_labels.at<int>(i, j) = c;
 						}
 					}
 				}
 			}
+		}
+		else{
+			//cerr << "missing spx" << endl;
 		}
 	}
 
@@ -168,6 +162,7 @@ void Slic::updateCenters(Mat& frame)
 			}
 			else{
 				cerr << "one label is -1 : impossible normally" << endl;
+				cout << i << "," << j << endl;
 			}
 		}
 	}
@@ -197,6 +192,7 @@ void Slic::enforceConnectivity()
 	int label = 0, adjlabel = 0;
 	int lims = (m_width * m_height) / (m_nSpx);
 	lims = lims >> 2;
+	if (lims < 2)return;
 	vector<vector<int> >newLabels;
 	for (int i = 0; i < m_height; i++)
 	{
@@ -232,7 +228,7 @@ void Slic::enforceConnectivity()
 						int x = elements[c].x + dx4[k], y = elements[c].y + dy4[k];
 						if (x >= 0 && x < m_width && y >= 0 && y < m_height)
 						{
-							if (newLabels[y][x] == -1 && m_labels_ptr[j] == m_labels.at<int>(y,x))
+							if (newLabels[y][x] == -1 && m_labels_ptr[j] == m_labels.at<int>(y, x))
 							{
 								elements.push_back(Point(x, y));
 								newLabels[y][x] = label;//m_labels[i][j];
@@ -254,7 +250,9 @@ void Slic::enforceConnectivity()
 	m_nSpx = label;
 	for (int i = 0; i < newLabels.size(); i++){
 		int* m_labels_ptr = m_labels.ptr<int>(i);
-		for (int j = 0; j < newLabels[i].size(); j++) m_labels_ptr[j] = newLabels[i][j];
+		for (int j = 0; j < newLabels[i].size(); j++){
+			m_labels_ptr[j] = newLabels[i][j];
+		}
 	}
 
 	//Careful :index in m_allCenters does not correspond anymore to the right label, but we do not need then anymore
@@ -267,7 +265,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 
 
 	/* Initialize the contour vector and the matrix detailing whether a pixel
-	 * is already taken to be a contour. */
+	* is already taken to be a contour. */
 	vector<Point> contours;
 	vector<vector<bool> > istaken;
 	for (int i = 0; i < image.rows; i++) {
@@ -290,7 +288,7 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 				int x = j + dx8[k], y = i + dy8[k];
 
 				if (x >= 0 && x < image.cols && y >= 0 && y < image.rows) {
-					if (istaken[y][x] == false && m_labels_ptr[j] != m_labels.at<int>(y,x)) {
+					if (istaken[y][x] == false && m_labels_ptr[j] != m_labels.at<int>(y, x)) {
 						nr_p += 1;
 					}
 				}
@@ -310,6 +308,6 @@ void Slic::display_contours(Mat& image, Scalar colour) {
 	}
 }
 
-Mat Slic::getLabels(){ return m_labels;}
+Mat Slic::getLabels(){ return m_labels; }
 int Slic::getNspx(){ return m_nSpx; }
 int Slic::getSspx(){ return m_diamSpx; }
