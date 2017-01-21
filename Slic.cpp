@@ -1,4 +1,4 @@
-#include "Slic.h"
+#include "Slic.hpp"
 
 void Slic::resetVariables()
 {
@@ -9,7 +9,7 @@ void Slic::resetVariables()
 	}
 }
 
-void Slic::initialize(Mat& frame, int nspx_size, float wc, int nIteration, InitType type)
+void Slic::initialize(const Mat& frame, const int nspx_size, const float wc, const int nIteration, const InitType type)
 {
 	m_nIteration = nIteration;
 	m_wc = wc;
@@ -28,7 +28,6 @@ void Slic::initialize(Mat& frame, int nspx_size, float wc, int nIteration, InitT
 	for (int j = 0; j < m_height; j++){
 		m_allDist[j] = vector<float>(m_width, FLT_MAX);
 	}
-
 }
 
 int dx_n[] = { -1, 0, 1, -1, 0, 1, -1, 0, 1 };
@@ -63,7 +62,7 @@ void moveToLowGrad(Point& xy_out, Vec3f& minColor, Mat& frameLab)
 		}
 	}
 }
-void Slic::generateSpx(Mat & frame)
+void Slic::generateSpx(const Mat & frame)
 {
 	resetVariables();
 	Mat frameLab;
@@ -95,7 +94,7 @@ void Slic::generateSpx(Mat & frame)
 		findCenters(frameLab);
 		updateCenters(frameLab);
 	}
-	//enforceConnectivity();
+	enforceConnectivity();
 }
 
 inline float slicDistance(center& c, float x, float y, float L, float a, float b, float S2, float m2)
@@ -104,7 +103,6 @@ inline float slicDistance(center& c, float x, float y, float L, float a, float b
 	float ds2 = pow(c.xy.x - x, 2) + pow(c.xy.y - y, 2);
 
 	return dc2 + ds2 / S2*m2;
-	//return sqrt(dc2 + ds2 / S2*m2);
 }
 void Slic::findCenters(Mat& frame)
 {
@@ -319,8 +317,3 @@ void Slic::displayMeanColor(Mat& out){
 	out.convertTo(out, CV_8UC3);
 	cvtColor(out, out, CV_Lab2BGR);
 }
-
-
-Mat Slic::getLabels(){ return m_labels; }
-int Slic::getNspx(){ return m_nSpx; }
-int Slic::getSspx(){ return m_diamSpx; }
